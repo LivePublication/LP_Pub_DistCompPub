@@ -53,16 +53,16 @@ authors:
       - ref: uc
     corresponding: true
     email: gus.ellerm@pg.canterbury.ac.nz
-    orcid: 0000-1111-2222-3333
+    orcid: 0000-0001-8260-231X
     equal-contributor: true
   - name: Mark Gahegan
     affiliations:
       - ref: ua
-    orcid: 0000-3333-2222-1111
+    orcid: 0000-0001-7209-8156
   - name: Benjamin Adams
     affiliations:
       - ref: uc
-    orcid: 0000-2222-1111-3333
+    orcid: 0000-0002-1657-9809
 affiliations:
   - id: uc
     name: University of Canterbury, Christchurch, New Zealand
