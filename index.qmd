@@ -1,0 +1,274 @@
+# Introduction {#sec-introduction}
+
+The way that science is published has not changed substantially in 350 years, despite the obvious limitations of a static and incomplete account of the research performed.  This is especially true for research that is 'born digital' where rich representations are removed in order to fit into the traditional article container literally a paper, or more recently a pdf. As the computational support of science becomes richer, the process of communicating a full and reproducible account of what was done has grown increasingly possible, but also increasingly cumbersome @baker20161.
+To address this the FAIR principles call for co-publication of code and data alongside the original research article @wilkinson2016fair. When an article is published alongside the accompanying code and data, it significantly enhances the potential for reuse, reproducibility, and transparency of the work. However, there remain many other unrealised improvements that we seek here to create fully reproducible, explainable, and self-updating (`live') publications, ensuring other researchers can effectively understand, validate, and build upon the work. 
+
+Our overall aim is to create a single container for a fully complete account of some conducted research, including data (even if remotely accessed), workflows, code, mathematics, tables and figures, and text.  And then to allow artefacts to be modified in response to newer or better versions becoming available.  The simplest example of this is a research article describing some dynamic phenomenon (such as the state of a pandemic or an ocean circulation model) that automatically updates itself when new data is available. 
+
+While supplementing traditional research articles with additional research artefacts has gained popularity, emerging research platforms are offering innovative ways to capture and communicate a scientist's workflow more fully. Platforms like Galaxy @jalili2020galaxy and Physiome @nickerson2017introducing facilitate the publication of computational workflows, models, and tools, while also offering remote execution services that promote the development of virtual laboratories and foster collaboration. Meanwhile, software tools such as Jupyter Notebooks @kluyver2016jupyter and Stencila @aufreiter2018stencila combine code, data, and descriptive elements, enabling interactive sessions that provide users with hands-on experience and a deeper understanding of the methodology. 
+
+These two perspectives---augmentation of traditional articles and development of new publication methods---both seek to resolve the gap between research performed and research communicated. Publication platforms that integrate executable code, data, and descriptive elements address foundational issues such as reproducibility, reuse, and transparency. Furthermore, they unlock the potential for innovative changes, such as creating dynamic research articles that respond to changes in their originating workflows, even once they have been published.
+
+This paper introduces a novel framework called *LivePublication* that seamlessly integrates highly distributed computational workflows, data, and descriptive elements. Its primary goal is to deliver dynamic, live research articles that accurately reflect the current state of the computational pipeline, thereby providing a more interactive and up-to-date representation of the research process. In fields where constant surveillance or regular data and algorithm improvements are common---e.g., environmental science and  pandemic monitoring---much published research is out of date even before it appears in print. This leads to huge inefficiencies and reliability issues, and new publications that only serve to update the data or methods. Integrating research articles with *distributed* computational workflows is an essential intricacy, as complex computational workflows often demand scalability, portability, and compartmentalisation of components. Distributed computational environments also offer potential for novel extensibility use cases and can foster enhanced communication and understanding of the underlying scientific methodology.
+
+After reviewing related work on co-publication, executable articles, workflow platforms, and virtual laboratories in next section, the required attributes of the LivePublication framework are introduced in @sec-LP_framework. Following that, in @sec-Implementing_LP we describe an instantiation of LivePublication that satisfies these requirements, leveraging prior work on Globus and the RO-Crate method. In @sec-case_study we demonstrate the utility of this approach with a natural language processing case study. Finally, we end with our vision for LivePublication going forward and plans for future work.
+
+# Background {#sec-background}
+
+The reproducibility crisis @baker2016reproducibility has led to a call for more transparent, repeatable, and verifiable research. The FAIR principles (Findable, Accessible, Interoperable, and Reusable), developed by Wilkinson et al. @wilkinson2016fair, provide guidelines for enhancing the reproducibility and transparency of research data and methods. Co-publication, where code, data, and external resources are published alongside traditional articles is one solution. This approach has been adopted widely, e.g., [Papers with Code](https://portal.paperswithcode.com/), [Zenodo](https://zenodo.org), and Research Compendium @stodden2015researchcompendia.  This mode of publication enables reproduction and reuse, reducing inefficiencies in research processes.
+
+In contrast to co-publication, 'executable articles' combine data, methods, and natural language content to create interactive documents that can be re-executed to reproduce original results or generate new insights @lasser2020creating. Tools such as Jupyter Notebooks @kluyver2016jupyter, Google Colaboratory @bisong2019google, and Stencila @aufreiter2018stencila interweave text with code cells to facilitate step-by-step, reproducible computations. In a slightly different approach, solutions like Paper Mâché @brammer2011paper, Executable Paper @strijkers2011toward, and Ghosh et al.'s neuroimaging re-executable publication @ghosh2017very separate the code and data from narrative text, providing a traditional article with re-execution capabilities. Our own previous effort @ellerm2022enabling integrates workflows and natural language text by combining Common Workflow Language (CWL) descriptions, execution capabilities, and author-written content on a central server. 
+
+The bioinformatics and biomedical communities in particular have developed many domain-specific workflow platforms. For example, Galaxy and Anduil 2 [@jalili2020galaxy; @cervera2019anduril] provide workflow capabilities and thus code abstraction and reuse of computational components. General workflow frameworks like Pegasus, CWL, and AiiDA [@deelman2015pegasus; @crusoe2022methods; @huber2020aiida] are geared towards providing universal solutions, with mechanisms to customise and develop bespoke workflows to meet diverse research needs. In industry, Amazon and Google both provide workflow platforms for cloud infrastructure. Workflow technologies provide some abstraction for complex, reusable scientific methodologies. It is this abstraction that serves as an interface for building and exporting artefacts, ready for integration into a publication medium (as described in @sec-LP_architecture).
+
+Virtual laboratories and scientific gateways abstract the complexity of underlying computational infrastructure, offering scientists an accessible and intuitive interface for conducting research. [Code Ocean](https://codeocean.com), HubZero @mclennan2010hubzero, and CIPRES @miller2011cipres offer tools for domain specific data management, analysis, and visualisation. MyExperiment and Wholetale [@goble2010myexperiment; @brinckman2019computing] are examples of virtual laboratories, serving as collaborative environments where researchers can create, share, and execute scientific workflows.
+
+LivePublication extends the capabilities of these platforms by directly interfacing with live workflow platforms and generating article-like outputs. This moves us towards a more dynamic, interactive, and up-to-date representation of research. 
+
+# LivePublication Framework {#sec-LP_framework}
+
+The design of LivePublication reflects the need to satisfy a dual set of functional requirements: those of computational workflows and of the publication process. Prior solutions to overcome gaps in publication often overlook the role of complex computational pipelines in science. Therefore, the LivePublication framework is designed to exhibit six key attributes: 
+
+1. **Liveness**: live links to all the computational resources used in a workflow, so that it can be responsive to changes (such as new data);
+2. **Reproducibility**: replication of the same results / conclusions given the computational method and data;
+ 3. **Reusability/Extensibility**: reuse of, or extension of, the computational pipeline components;
+4. **Transparency**: the ability to inspect the computational pipeline, with tools to automatically derive text descriptions of workflow and code;
+5. **Distribution**: support for complex, distributed computational pipelines and data repositories;
+6. **Completeness**: The methods, data, workflow, results, and findings are held within a single container, with their inter-dependencies intact.
+
+The concept of 'reproducibility' is best defined by The Turing Way @Way_Community_The_Turing2019-qd, which delineates reproducibility into four distinct categories based on analysis and data: Reproducible, Replicable, Robust, and Generalizable. We adopt these definitions for clarity and precision in discussing LivePublication. A fundamental requirement of a LivePublication instance is reproducibility, as each LivePublication is generated through the periodic re-execution of its underlying computational pipeline. Depending on the extensibility and reusability of a given instance, as supported by its underlying infrastructure, it can also meet the conditions for being replicable and robust.
+
+Reusability, within the LivePublication framework, refers to the ability of methods---both computational and broader scientific methodologies---to be reused by a third party. At its simplest, the inclusion of static code within the publication can satisfy the basic reusability criteria established by many journals. The LivePublication computational pipeline can enable more dynamic forms of reuse. For instance, where portions of the computational workflow can be repurposed and incorporated by external parties, emulating the code execution behaviour seen in tools like Jupyter notebooks @kluyver2016jupyter. 
+
+Transparency in LivePublication extends beyond simple code availability. It encapsulates the clarity of the methodology: its communication and the precision of that communication. A transparent method provides tools that enable users to understand the process in question and make informed value judgements about its application. LivePublication facilitates more comprehensive descriptions via computational methods to automatically generate various levels of text description of both code and workflow. 
+
+Distribution is addressed via scalability and data locality. Beyond these pragmatic concerns, distributed pipelines offer significant value in terms of their inherent modular structure. By compartmentalising methods into granular computational units, we enhance both reusability and extensibility. Finally, completeness is achieved by bringing all aspects of a science experiment, from the data to the resulting publication, into a single container.
+
+## LivePublication architecture {#sec-LP_architecture}
+
+An overview of the LivePublication technology stack is provided in @fig-highlevel_architecture and shows the three conceptual levels of the architecture. 
+
+![High-level LivePublication architecture](Figures/Highlevel-architecture.png){fig-alt="LivePublication architecture outline" #fig-highlevel_architecture width=75%}
+
+The foundation *Layer 1*, denoted as *Hardware / Infrastructure / Aggregate Systems*, encompasses the essential technology necessary for the distributed computational workflow. This can include a myriad of components, from virtual machines and scientific instruments (like sensors and speciality hardware) to data stores and other enabling technologies. Despite the potential diversity in form, each component must meet certain prerequisites to participate within a distributed workflow---namely, they must be accessible and actionable by a workflow management system.
+
+Moving up to *Level 2*, two concurrent components are presented representing a primary innovation of the LivePublication framework. Sitting upon the hardware layer, the Workflow and Data Management systems orchestrate the computational process. Development efforts are actively underway for tools that manage workflow execution. Galaxy @jalili2020galaxy, Globus @foster1998globus, Pegasus @deelman2015pegasus, and CWL @crusoe2022methods represent a handful of well-known workflow management tools, each with its unique focus and priorities. For the LivePublication context, tools that emphasise robust data management techniques, such as data locality, efficient data transfer at scale, and cross-boundary data transfer, are particularly advantageous. These tools align well with the functional requirements of today's researchers and can effectively facilitate the creation of a LivePublication.
+
+LivePublication Artefact Generation occurs concurrently, and agnostically, of workflow execution. Essentially, each step or computational unit generates a descriptive artefact, documenting its execution and the ensuing results. This critical process forms the cornerstone of integrating workflow executions with publication media, offering a mechanism for distilling information from multiple computational steps and preserving their outputs for subsequent processing. By maintaining a clear and detailed record of each step of the scientific process (not just those steps conducted locally), it not only enhances transparency but also greatly facilitates reproducibility and extensibility.
+
+Finally, *Level 3 -- Publication: Presentation and Integration* serves as the integration point for LivePublication artefacts, synthesising the outputs of the executed workflow into a cohesive, comprehensive account. This includes the results of the computational process like figures and resultant data, as well as the publication artefacts generated during the workflow execution. Beyond these, it can incorporate additional information such as workflow definition, versioning details, and other supplementary information, providing a rich, detailed snapshot of the entire scientific process. 
+
+# Implementing LivePublication {#sec-Implementing_LP}
+
+This section discusses the specific technologies that have been chosen to actualise LivePublication, showing how integration between distributed workflows and publications can be achieved. In particular, we highlight how these technologies facilitate seamless information integration between distributed workflows and the subsequent publication process.
+
+## L1: Cloud computing
+
+Cloud computing services are a natural choice for implementing *Layer 1* due to their scalability and flexibility, accommodating the variable computational and data storage needs inherent in scientific workflows. Our initial implementation of LivePublication uses the [Nectar Research Cloud](www.nectar.org.au), an OpenStack-based cloud computing platform, due to its availability, flexibility, and control that OpenStack provides over the deployed infrastructure. These qualities directly align with the LivePublication design objectives, particularly in terms of extensibility and distributed computing, as they allow for customisation and seamless integration with various computational workflows. OpenStack's open-source nature further facilitates this by encouraging collaboration and customisation, making it a fitting choice for LivePublication.
+
+## L2: Workflow orchestration and artefact generation {#sec-workflow_platforms}
+
+### Workflow orchestration
+
+Transitioning to *Layer 2*, we turn our focus to workflow management. The choice of workflow platform is a significant decision, as LivePublication relies on the close integration of workflow execution and artefact generation. LivePublication requires access to each computational step in a workflow's execution, providing an interface to generate and export a descriptive artefact (*LP Artefact*) for later processing. So the workflow platform must be open source, and support custom behaviours and plugins. While several workflow platforms do offer means to implement custom workflow steps [@crusoe2022methods; @huber2020aiida; @jalili2020galaxy], we here take the view that outcomes of a step (LP Artefacts) are better represented as external to the step itself, as generalised pre/post processing for a custom LivePublication class of workflow.
+
+A custom Globus AP template has been developed to support the integration of LivePublication with Globus flows. The template is a simple Flask REST server, providing the base functionality to integrate with the Globus-Auth service and enabling LivePublication artefact generation (covered in the next section). Each LivePublication Action Provider (LPAP) is extended in three important ways:
+
+- **Containerisation**: Packaging the computational method as a Docker container;
+- **Artefact Generation**: Functionality to generate LP artefacts and integrate metadata;
+- **Artefact Transfer**: Automating reliable transfer of generated LP artefacts for subsequent processing.
+
+Each LPAP contains a Docker image of the computational method it executes as its service. Packaging the method in this way provides four primary advantages: environment management, reuse and inclusion, parallelisation, and AP maintenance. 
+
+#### Containerisation
+
+Abstracting the execution environment from the server environment is required as many computational methods rely on specific dependencies and configurations for their execution. Docker images are integrated with LPAPs through a mirrored directory structure shared between the image and server. LPAPs include *input* and *output* directories which map to directories of the same name within the docker container. This allows incoming data to be ingested, and processed data to be exported, between the container and servers contexts. Further, these standard directories enable the inclusion of both incoming data and processed data within LP Artefacts. 
+
+Containerisation enables us to bundle the computational method within an LP artefact. Moreover, containers are capable of handling numerous incoming action requests simultaneously, scaling well. Lastly, containerisation fosters an agile development environment and simplifies the maintenance of the AP's method. By encapsulating each service within its container, modifications can be made without disrupting the entire system, contributing to a more resilient and manageable system overall. 
+
+#### Artefact generation {#sec-artefact_generation}
+
+For the generation of LP artefacts, we have developed an open-source Python library `lp_ap_tools`. A Python decorator (@lst-lp_ap_tools) encapsulates the execution of the computational method's Docker container within the LPAP. By wrapping the executed method in this decorator, metadata mining and information gathering can be performed both pre- and post-execution. 
+
+```{#lst-lp_ap_tools .python lst-cap="LP_artefact decorator"}
+@LP_artefact(dir_struct=directory_structure)
+def run_computation(**arguments):
+  # Execute method container
+  container = client.containers.run(
+  image='computation_image:latest',
+    volumes=volumes,
+    detach=True
+  )
+```
+
+Pre-execution information and metadata draws on three primary sources: the LPAP, Globus services, and the server's operating system. Each LPAP is equipped with descriptive fields, for example name, description, and keywords, which are integrated into the LivePublication artefacts. Additionally, the `lp_ap_tools` library provides a means for customising and incorporating LivePublication-specific fields into the AP's parameters dynamically, enriching the scope of data included in LivePublication artefacts. For example, a `user_comment` field can be integrated into both REST parameters and LivePublication artefacts automatically. Further, the inclusion of source code and execution environment information is made possible by the incorporation of docker build files and respective code. Globus services, such as Globus-Auth, can be utilised to gather relevant details about the user, e.g. name and affiliation, and finally a full description of the hardware and configuration details of the AP can be retrieved from the server.
+
+During the execution of the method, measurements can be taken, for example, execution time and resource utilisation. Currently, there is no system in place for interfacing and exporting measurements from inside the method's container, however this possibility provides a further avenue for exporting descriptive metadata. Post-execution information and metadata primarily consists of the computational results: data, figures, and/or text which is included within the artefact. 
+
+#### Artefact transfer
+
+Upon completing a flow consisting of LPAPs, each AP is responsible for transferring their corresponding artefacts to a designated orachestration node for collation and further processing. This is achieved by including a `orchestration_node_id` parameter in each LPAP, which is expected to contain a Globus endpoint ID. The LPAPs are configured to request permissions for the Globus transfer API, thereby granting them the authority to execute transfers on behalf of the user. Upon completion of an AP's tasks, the LPAPs utilise the Globus transfer API to transmit their results to the assigned orchestration node.
+
+#### Orchestration node
+
+Given a set of LPAPs, the orchestration node manages them to form a flow. The orchestration node provides two functions:
+
+- **Dispatches Globus flows**: Initiates the execution of workflows, composed from a series of LPAPs and Globus APs;
+- **Collects and processes LPAP artefacts**: Gathers and processes the artefacts from each LPAP
+
+The orchestration node achieves these functions using Gladier @vescovi2022linking, a Globus SDK, which enables the node to programmatically construct workflows from individual descriptions of LPAPs and Globus transfer APs. This capability allows the node to flexibly orchestrate workflows (and LivePublications), which can be adjusted as needed to suit varying use cases. 
+
+As an example, consider a flow that includes LPAPs *Process_one* and *Process_two*. The orchestration node generates a simple flow description as follows:
+
+```{#lst-WEP .json lst-cap="Generated Workflow Execution Plan"}
+{
+  "Comment": "<Comment>",
+  "StartAt": "Process_one",
+  "States": {
+    "Process_one": {
+      "ActionScope": "<ActionScope>",
+      "ActionUrl": "<ActionUrl>",
+      "Parameters": {
+        "orchestration_node_id": "<orch_id>"
+      },
+      "ResultPath": "<ResultPath>",
+      "next": "Process_two"
+    },
+    "Process_two": {
+      "ActionScope": "<ActionScope>",
+      "ActionUrl": "<ActionUrl>",
+      "Parameters": {
+        "orchestration_node_id": "<orch_id>"
+      },
+      "ResultPath": "<ResultPath>",
+      "End": True
+    }
+  }
+}
+```
+
+This flow description is then submitted to Globus using the users credentials. Gladier oversees the workflow's execution, and the orchestration node simultaneously collects generated LPAP artefacts. Upon the completion of a workflow, the orchestration node gathers a description of the flow's execution returned by Globus, and embeds this information into a unique artefact specific to the orchestration node. This artefact provides a comprehensive depiction of the Globus flow's execution, including details about each step, its identifying parameters, and additional metadata. 
+
+The information held within this artefact includes but is not limited to: the action ID, the completion time, the status, and flow ID. Essentially, this artefact provides a blueprint of the execution path of the Globus flow. Here is an example of such an execution description: 
+
+```{#lst-WED .json lst-cap="Completed Workflow Execution Description"}
+{
+  "action_id": "<action_id>",
+  "completion_time": "<completion_time>",
+  "display_status": "<display_status>",
+  "flow_id": "<flow_id>",
+  "details": {
+    "output": {
+      "Process_one": {
+        "action_id": "<action_id>",
+        "completion_time": "<completion_time>",
+        "display_status": "<display_status>",
+        "details": {}
+      },
+      "Process_two": {
+        "action_id": "<action_id>",
+        "completion_time": "<completion_time>",
+        "display_status": "<display_status>",
+        "details": {}
+      }
+    }
+  }
+}
+```
+
+The orchestration node artefact is a structure integrating separate LPAP artefacts. It does so by aligning the `action_id` fields (@fig-comb_metadata), thereby forming a comprehensive account of the flow's execution. This process results in a holistic description, uniting the separate elements into an interconnected narrative of the workflow's path and outcomes. 
+
+![Integrating LPAP artefacts](Figures/combining-metadata.png){fig-alt="Integrating LPAP data and Orchestration data" #fig-comb_metadata width=70%}
+
+The result of this orchestration technique, utilising Globus APs, LPAPs, `lp_ap_tools`, and Gladier orchestration node, is a generalised method for collecting, enriching, and exporting a full description of methods used during a computational workflow, including the methods themselves. A visual overview of this process is provided in @fig-Globus_LP_artefact_gen. At this stage, the integrated artefact performs well as a workflow provenance and reuse / reproducibility artefact. This technology, additionally, sets the groundwork for tight integration between the execution of a computational method, and the real-time generation live, representative publications. The LPAP template is [available here](https://github.com/LivePublication/LP_GlobusAP_Template), demonstrating the practical implementation of custom AP services. 
+
+::: {.column-body-outset}
+![Integrating artefact generation and orchestration with Globus Flows (L2 of LivePublication Architecture)](Figures/Globus-LPArtefact.png){fig-alt="Depiction of artefact generation and orchestration using Globus Flows." #fig-Globus_LP_artefact_gen}
+:::
+
+### AP Artefacts
+
+This section discusses the artefacts themselves, the technologies that enable their representation, and how they are poised to interface with *Layer 3* publications, as shown in @fig-highlevel_architecture. LP artefacts are dynamic objects that encapsulate data, results, and associated descriptive metadata from each computational step in a workflow. They are designed with two essential properties:
+
+- **Self-contained and describing**: Artefacts should encapsulate all the necessary information to describe the computation performed within a LPAP;
+- **Identifiable/Indexable**: Artefacts must have consistent, unique identifiers that allow them to be accurately referenced within a publication, specifically figures, tables, and other features
+
+Each LPAP artefact contains a minimal set of data required to express the methods and results generated during its action. This must include a description of the purpose and intended application context of the LPAP, the methods used to achieve this purpose, and finally the generated results and data used. This requirement achieves two purposes. First, it ensures that each LPAP artefact is a discrete, stand-alone package of information regarding the execution of an AP, and second, it provides the minimal amount of information for methodology descriptions that can be woven into the publication. 
+
+The final, collated artefact must maintain consistent identifiers for use as references within the publication layer. Generated files within a flow may be inconsistent dependent on input data and flow design. To ensure consistency, LPAPs need to associate unique identifiers with their expected outputs. However there is room for further research to develop a universally applicable solution for internal identifiers, ensuring consistent reference from the point of artefact generation to publication.
+
+To build artefacts that reflect these qualities, the RO-Crate specification @soiland2022packaging was selected due to its versatility, extensibility, and compatibility with diverse data types and computational workflows. Furthermore, the existence of RO-Crate SDKs simplifies its implementation, making it an approachable option for development. Notably, RO-Crates can be converted to human-readable websites, providing a user-friendly way to interface these data-rich artefacts with the publication layer. 
+
+RO-Crate is built around the concept of Research Objects (ROs), which align well with generated LPAP artefacts. ROs provide semantically rich, linked data, "bundling together essential information relating to experiments and investigations" [Why linked data is not enough for scientists @bechhofer2013linked]{.aside}. Bechhofer et al. @bechhofer2013linked discuss how ROs enable *Revealable* (auditable) experimentation, *Lifecycle* provenance recording, and *Versioning*, which align with LivePublication's publication layer. 
+
+RO-Crate adds a descriptive specification grounded in `schema.org` and articulated in JSON-LD. This allows RO-Crate objects to define heterogeneous research outputs via metadata and linked data. Conceptually, RO-Crate divides possible content into two categories: *Data Entities*---e.g. a file or directory, and *Contextual Entities*---external information stored via metadata. RO-Crate can define links between these entities, enabling relationship modelling and creating a rich, interconnected description of research outcomes. 
+
+LPAP RO-Crate artefacts map a user (who executes the action within the flow) to an Action Provider (the actual provider being run) and its respective components, as depicted in @fig-LPAP_relationship_schema below.
+
+![Integrating LPAP artefacts](Figures/ROcrate_LPAP.png){fig-alt="LPAP RO-Crate relationship representation" #fig-LPAP_relationship_schema width=60%}
+
+These individual LPAP RO-Crate artefacts are incorporated into the orchestration artefact via the orchestration node, extending the Workflow RO-Crate profile (v1.0). This profile provides a standard schema for delineating workflow products. While there are variants of this workflow product schema for the Common Workflow Language (CWL) and Galaxy, a Globus Flows variant is not currently available. 
+
+To meet the specific needs of LivePublication, a two-fold approach is taken in the design of the orchestration artefact. The artefact outlines both the Workflow Execution Plan (WEP), which describes the Globus flow itself, and the Workflow Execution Description (WED), which details the actual instance of the workflows execution, containing generated LPAP artefacts. Find an example orchestration RO-Crate [here](http://130.216.217.137:8080/).
+
+While RO-Crate offers promising features and capabilities for LPAP artefact representation and management, research to devise and refine RO-Crate profiles specifically tailored for LivePublication is ongoing. These profiles will aim to provide a unified schema for both the LPAP artefacts and the overarching orchestration node artefact, enabling the systematic assembly of complex flow outputs. 
+
+## L3: Publication - presentation and integration
+
+The Publication layer (level 3) is the most nascent layer and is predicated upon the generated orchestration RO-Crate artefact as described in @sec-artefact_generation. This RO-Crate is directly integrated with a website, hosted on the orchestration node, providing a platform for generative- and author-driven content to be displayed. 
+
+Linking between the website content and resultant RO-Crate is achieved through static indexing of workflow outcomes and artefacts. This enables an 'adaptor' which ingests and updates the publication with each successive workflow execution. Figures, tables, and data are linked to the publication, allowing the author to reference and use these artefacts within the content of the paper. 
+
+Generative content created using LLMs and strict data inputs such as the Workflow Execution Plan, enable sections of a publication (e.g., methodology) to be automatically generated upon execution of the Globus flow. Research on constraining the possibility of hallucination, and including useful supplementary data from the Workflow Execution Description (e.g., time taken per step, descriptive metadata provided by the author) is ongoing. 
+
+The current version of the publication layer has some limitations. At present, the generated article largely relies on static indexing of workflow outcomes and artefacts, enforcing a rigid deployment mechanism through custom adaptors. Further, the integration of author driven content and live artefacts is limited by a lack of internal linking and logic rules regarding the publications content. These features are currently being addressed in ongoing research to develop a publication artefact schema designed specifically for publication deployment. 
+
+# Comparative Language Identification Case Study {#sec-case_study}
+
+This section demonstrates a practical application of the technology elaborated upon in @sec-Implementing_LP. Hundreds of research articles are published every year using language models that are trained on massive and changing online datasets, making them excellent candidates for live publication. Here we present a comparative case study of two popular language identification models: [fastText v0.9.2](https://pypi.org/project/fasttext/0.9.2/) and [langdetect v1.0.9](https://pypi.org/project/langdetect/)
+
+We use a standard language identification dataset, which can be accessed [here](https://huggingface.co/datasets/papluca/language-identification/viewer/papluca--language-identification/validation). Both models ingest the dataset and generate ISO 639-3 language codes [accessed here](http://130.216.217.137:8080/) as outputs. These codes are then processed by the statistics LPAP for analysis and content generation. The entire process is orchestrated as a Globus flow, as depicted in @fig-LID_flow.
+
+::: {.column-body-outset}
+![LivePublication language identification comparison flow](Figures/LiD_flow.png){fig-alt="LID case study Globus Flow representation" #fig-LID_flow}
+:::
+
+The completion of the Globus flow results in the creation of LP artefacts generated by each LPAP. These artefacts serve as containers of information, capturing the details and outcomes of each computational step within the flow. They are subsequently integrated into a unified, orchestration RO-Crate @fig-human_readable_RO_Crate. This RO-Crate serves as the data model which drives the LivePublication. The complete RO-Crate, which provides a detailed view of the data and processes can be [accessed here](http://130.216.217.137:8080/).
+
+::: {.column-page}
+:::{.column width="45%"}
+[![Natural language article](Figures/LiD_LP.png){fig-alt="Publication integrated with LivePublication outputs" #fig-LID_LP}](http://130.216.217.47:8080/papers/lid-method-comparison-lp)
+:::
+
+:::{.column width="3%"}
+:::
+
+:::{.column width="45%"}
+[![Orchestration RO-Crate outputs](Figures/rocrate-human.png){fig-alt="Human readable version of Orchestration RO-Crate" #fig-human_readable_RO_Crate}](http://130.216.217.137:8080/)
+:::
+:::
+
+Using the generated data and figures from the statistics LPAP, we [link a publication](https://livepublication.github.io/LP_Pub_LID/) to these live, updating outputs (@fig-LID_LP). Metrics generated via the statistics node, such as accuracy per language, are included as live artefacts within the publication itself. Furthermore, we show that simple GPT-4 integration, primed with the input: `Generate a description of this workflow, from the perspective of an academic methodological section: <WEP>` generates correct, reflective descriptions of the computational methodology.
+
+As the underling RO-Crate data model matures, and further systems are developed to take advantage of live data, more complex LivePublication systems will be possible, enabling a wider range of behaviours.  
+
+# Conclusions and Future Work {#sec-futurework}
+
+As the tools that we use to enable our scientific methodologies become increasingly computationally bound, eScience communities and developers have explored how we can enable scalable and accessible science though the use of workflow platforms, virtual laboratories, and scientific gateways. Conversely, scientific communication within computationally-enabled domains has seen less-focused development, leading to increasingly inefficient reporting of outcomes and low reproducibility and reuse within our publications. 
+
+Recent efforts towards facilitating better scholarly communication---such as developing ways to share research objects, providing virtual laboratory platforms for collaborative work, and designing self-contained, executable articles---have made significant strides towards an integrated future, where computational methods and results are fundamental parts of their respective publications. However, there still remains a gap between how data is collected, our scientific workflow practices, and how we communicate our results. In order to address this gap we identified six key attributes that any system designed to capture a comprehensive and dynamic account of computational research must satisfy: **liveness**, **reproducibility**, **reusability**, **transparency**, **distribution**, and **completeness**. 
+
+LivePublication brings these attributes together in one framework by building upon prior work (Globus and RO-Crate) to create a system that integrates article publication with live data sources and the execution of distributed scientific workflows. The result is a platform where a publication is designed once and executed many times in a form of live science---i.e., the content reflects the outcomes of the most recent method execution. Additionally, using the underlying workflow integration in a language model case study, we demonstrated that we can embed rich information on workflow execution---input data, results, timings---directly into the content of the live publication.
+
+As we look to the future, we are focusing our efforts on developing tooling that will further integrate Layer 2 Artefacts with Level 3 Publications. The result will be a self-contained, self-descriptive publication artefact that includes all descriptive content needed to present the research to readers, ready for deployment online.
+
+The development of this publication artefact will involve experimental content generation, including: 
+
+- **Self-documenting descriptions**: Workflow and methodology descriptions that automatically generate documentation, giving insight into computational processes they encapsulate;
+- **Generative stitching of author-provided content**: Automated integration of author-provided narrative with computational results;
+- **Dynamic content inclusion/exclusion criteria**: Flexible rules to determine what content is included or excluded from the final publication based on computational outputs;
+- **Hybrid dynamic content**: Content that adapts based on the underlying RO-Crate model, blending author-written narrative with live results. 
+
+In addition, ongoing research is exploring how live science can further enrich the publication process itself. As a framework for developing live, reflective publications, LivePublication can monitor the change in results and methodologies over the lifecycle of an experiment. Enabling versioning and comparative views can provide a method of insight into the performance of new methods and results. 
+
+# References
